@@ -1,108 +1,323 @@
 <style>
-/* Streamlit: Menü ausblenden, aber Top-Bar behalten */
-#MainMenu { visibility: hidden; }
 
-/* Nur Streamlit-Footer ausblenden (nicht global footer{}) */
-div[data-testid="stFooter"] { display: none !important; }
+    /* Streamlit Header/Toolbar behalten! Nichts verstecken. */
+#MainMenu { visibility: hidden; }                 /* optional */
+div[data-testid="stFooter"] { display:none !important; } /* optional */
 
-/* Streamlit Top-Bar einfärben (Deploy/Rerun bleiben rechts sichtbar) */
+/* Streamlit-Header optisch anpassen (optional) */
 header[data-testid="stHeader"]{
   background:#111 !important;
 }
 
-/* Streamlit Toolbar (rechts) klickbar halten */
-div[data-testid="stToolbar"]{
-  z-index: 1005 !important;
+/* Dein Header klebt unter der Streamlit-Bar */
+.topbar{
+  position: sticky;
+  top: 3.25rem;   /* Höhe der Streamlit-Topbar (falls nötig auf 3.0 oder 3.5 anpassen) */
+  z-index: 50;
+}
+@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.1/css/all.min.css");
+
+/* Optional: Streamlit Menü ausblenden (Topbar bleibt!) */
+#MainMenu { visibility: hidden; }
+div[data-testid="stFooter"] { display: none !important; }
+
+/* Theme */
+:root{
+  --bg1: #2b1850;
+  --bg2: #3a2368;
+  --topbar: #a88cff;
+  --topbar2:#8f73f0;
+  --text: #ffffff;
+  --muted: rgba(255,255,255,.78);
+  --card: rgba(255,255,255,.07);
+  --border: rgba(255,255,255,.10);
+  --shadow: 0 8px 24px rgba(0,0,0,.25);
 }
 
-/* ===== Kombinierter Header (links) ===== */
-.appbar-left{
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 280px;          /* Platz für Streamlit Buttons rechts */
-  height: 3.25rem;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0 18px;
-  z-index: 1004;
-  pointer-events: none;  /* Container blockiert nichts */
+/* Background */
+.stApp{
+  background: radial-gradient(1200px 700px at 20% 0%, var(--bg2), var(--bg1));
+  color: var(--text);
 }
 
-.appbar-left a,
-.appbar-left input,
-.appbar-left button{
-  pointer-events: auto;  /* Links/Input/Button wieder klickbar */
+.block-container{
+  max-width: 1100px;
+  padding-top: 14px;
 }
 
-.appbar-left .brand{
-  color:#fff;
-  text-decoration:none;
-  font-weight:800;
-  font-size:18px;
-  white-space: nowrap;
-}
-
-.appbar-left .nav{
+/* ===== Header ===== */
+.topbar{
+  background: linear-gradient(0deg, var(--topbar2), var(--topbar));
+  border-radius: 16px;
+  padding: 12px 14px;
   display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-}
-.appbar-left .nav a{
-  color:#fff;
-  text-decoration:none;
-  padding:6px 10px;
-  border-radius:10px;
-}
-.appbar-left .nav a:hover{ background: rgba(255,255,255,.12); }
-
-.appbar-left form{
-  display:flex;
-  gap:8px;
   align-items:center;
-  flex:1;
-  max-width: 520px;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: var(--shadow);
+}
+
+.top-left{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+  flex: 1;
   min-width: 220px;
 }
-.appbar-left input[type="search"]{
-  width:100%;
-  padding:8px 10px;
-  border-radius:10px;
-  border:1px solid #ddd;
-  box-sizing:border-box;
-}
-.appbar-left button{
-  padding:8px 12px;
-  border-radius:10px;
-  border:0;
-  background:#2d6cdf;
-  color:#fff;
-  cursor:pointer;
+
+.brand{
+  font-weight: 900;
+  letter-spacing: .2px;
+  color: #1b1033;
+  text-decoration:none;
   white-space: nowrap;
 }
-.appbar-left button:hover{ filter: brightness(.95); }
 
-/* Content-Breite wie gehabt */
-.block-container { max-width: 1100px; padding-top: 16px; }
+.searchbar{
+  display:flex;
+  align-items:center;
+  gap: 8px;
+  flex: 1;
+  max-width: 620px;
+}
 
-/* ===== Dein bestehendes Grid/Card/Tag CSS bleibt darunter unverändert ===== */
-/* ... hier folgt dein .grid/.card/.tag CSS ... */
+.searchbar input[type="search"]{
+  width:100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 0;
+  outline: none;
+  background: rgba(255,255,255,.88);
+  color: #1b1033;
+}
 
-    .grid {
+.searchbar select{
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 0;
+  background: rgba(255,255,255,.88);
+  color: #1b1033;
+}
+
+.searchbar button{
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 0;
+  cursor:pointer;
+  background: rgba(27,16,51,.92);
+  color:#fff;
+  white-space: nowrap;
+}
+.searchbar button:hover{ filter: brightness(.96); }
+
+.top-right{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.navlink{
+  color: #1b1033;
+  text-decoration:none;
+  font-weight: 800;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+.navlink:hover{ background: rgba(255,255,255,.35); }
+
+/* ===== Hero Banner ===== */
+.hero{
+  margin-top: 14px;
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.hero-bg{
+  display:grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  padding: 12px;
+  background: rgba(0,0,0,.15);
+}
+
+.hero-bg img{
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 12px;
+  filter: saturate(1.05) contrast(1.05);
+  opacity: .70;
+}
+
+.hero-overlay{
+  position:absolute;
+  inset:0;
+  background: linear-gradient(90deg, rgba(12,8,28,.90) 0%, rgba(12,8,28,.55) 45%, rgba(12,8,28,.20) 100%);
+}
+
+.hero-content{
+  position:absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display:flex;
+  align-items:center;
+  padding: 18px 18px;
+  max-width: 720px;
+}
+
+.hero h1{
+  margin:0 0 8px 0;
+  font-size: 30px;
+  line-height: 1.12;
+}
+.hero p{
+  margin:0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+/* ===== Sections ===== */
+.section{ margin-top: 20px; }
+.section h2{
+  margin:0 0 10px 0;
+  font-size: 16px;
+  letter-spacing:.2px;
+}
+
+/* Horizontal row */
+.row{
+  display:flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.row::-webkit-scrollbar{ height: 10px; }
+.row::-webkit-scrollbar-thumb{ background: rgba(255,255,255,.12); border-radius: 999px; }
+
+/* Poster card */
+.poster-card{
+  min-width: 170px;
+  max-width: 170px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  text-decoration:none;
+  color: #fff;
+  transition: transform .10s ease, box-shadow .10s ease;
+}
+.poster-card:hover{ transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0,0,0,.28); }
+
+.poster-card img{
+  width:100%;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  display:block;
+  background: rgba(255,255,255,.05);
+}
+.poster-meta{ padding: 10px 12px 12px; }
+.poster-title{
+  font-weight: 900;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow:hidden;
+  text-overflow: ellipsis;
+}
+.poster-sub{
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  display:flex;
+  align-items:center;
+  gap: 6px;
+}
+.star{ color: gold; }
+
+/* Genre chips */
+.chips{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.chip{
+  display:inline-block;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.12);
+  color:#fff;
+  text-decoration:none;
+  font-weight: 800;
+  font-size: 12px;
+}
+.chip:hover{ background: rgba(255,255,255,.16); }
+
+/* ===== Search results grid (dein bestehendes Grid) ===== */
+.grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 14px;
 }
 .card {
-  background: #fff;
-  border-radius: 10px;
+  background: rgba(255,255,255,.06);
+  border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  border: 1px solid rgba(255,255,255,.10);
   transition: transform .08s ease, box-shadow .08s ease;
   text-decoration: none;
   color: inherit;
   display: block;
 }
-/* ... rest von deinem .card/.tag CSS ... */
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px rgba(0,0,0,.28);
+}
+.card img {
+  width: 100%;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  display: block;
+}
+.card .t {
+  padding: 8px 10px 10px;
+  font-size: .92rem;
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Footer */
+.site-footer{
+  margin-top: 26px;
+  padding: 10px 4px 2px;
+  opacity: .9;
+}
+.site-footer a{
+  color: rgba(255,255,255,.88);
+  text-decoration:none;
+  font-weight: 900;
+}
+.site-footer a:hover{ text-decoration: underline; }
+
+/* Responsive */
+@media (max-width: 900px){
+  .hero-bg{ grid-template-columns: repeat(4, 1fr); }
+  .hero-bg img{ height: 120px; }
+  .searchbar{ flex-wrap: wrap; }
+}
+@media (max-width: 600px){
+  .topbar{ padding: 10px 12px; }
+  .top-right{ width: 100%; }
+  .searchbar{ width: 100%; max-width: none; }
+  .hero-bg{ grid-template-columns: repeat(3, 1fr); }
+  .hero h1{ font-size: 22px; }
+  .poster-card{ min-width: 150px; max-width: 150px; }
+}
 </style>
