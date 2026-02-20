@@ -54,6 +54,31 @@ with open("styles.html", "r") as f:
 
 st.markdown(css, unsafe_allow_html=True)
 
+import html
+import urllib.parse as up
+
+decoded_q = up.unquote(q) if q else ""
+
+header_html = f"""
+<div class="site-header">
+  <div class="site-wrap">
+    <a class="site-brand" href="/?view=grid">TV-Serien</a>
+
+    <form class="site-search" action="/" method="get">
+      <input type="hidden" name="view" value="grid">
+      <input type="search" name="q" value="{html.escape(decoded_q)}" placeholder="Serie suchen…">
+      <button type="submit">Suchen</button>
+    </form>
+
+    <nav class="site-nav">
+      <a href="/?view=seite1">Unterseite 1</a>
+      <a href="/?view=seite2">Unterseite 2</a>
+    </nav>
+  </div>
+</div>
+"""
+st.markdown(header_html, unsafe_allow_html=True)
+
 full_star = '<i class="fa-solid fa-star"></i>'
 half_star = '<i class="fa-solid fa-star-half-stroke"></i>'
 empty_star = '<i class="fa-regular fa-star"></i>'
@@ -177,3 +202,13 @@ if q:
         st.markdown("".join(cards_html), unsafe_allow_html=True)
 else:
     st.info("Gib einen Suchbegriff ein und klicke auf **Suchen** (oder drücke Enter).")
+
+footer_html = """
+<div class="site-footer">
+  <div class="site-wrap">
+    <a class="site-brand" href="/?view=grid">TV-Serien</a>
+    <span style="opacity:.8;">© 2026</span>
+  </div>
+</div>
+"""
+st.markdown(footer_html, unsafe_allow_html=True)
