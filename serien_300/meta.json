@@ -6,7 +6,7 @@
   "segments": [
     {
       "segment_id": "212d5799-7fd4-48e6-9fc6-c7a7eb6a34e8",
-      "max_doc": 300,
+      "max_doc": 8000,
       "deletes": null
     }
   ],
