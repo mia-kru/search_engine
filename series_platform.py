@@ -133,7 +133,7 @@ if view == "detail" and selected_id:
     st.stop()
 
 # Hauptseite
-st.title("TV-Serien")
+#st.title("TV-Serien")
 
 # items = [10,25,33,42,102,111,124,298]
 # random_cards_html = []
@@ -156,20 +156,20 @@ st.title("TV-Serien")
 # Verarbeitet die aktuelle Anfrage (Query);
 decoded_q = up.unquote(q) if q else ""
 
-with st.form("search_form", clear_on_submit=False):
-    query_text = st.text_input(
-    "Suchbegriff eingeben",
-    value=decoded_q,
-    placeholder="z. B. Breaking Bad, Dark, etc. ..."
-)
-    submitted = st.form_submit_button("Suchen", type="primary")
-if submitted:
-    t = query_text.strip()
-    if t:
-        st.query_params.update({"q": up.quote(t, safe=""), "view": "grid"})
-        st.rerun()
-    else:
-        st.info("Bitte gib einen Suchbegriff ein.")
+#with st.form("search_form", clear_on_submit=False):
+#    query_text = st.text_input(
+    #"Suchbegriff eingeben",
+    #value=decoded_q,
+    #placeholder="z. B. Breaking Bad, Dark, etc. ..."
+#)
+    #submitted = st.form_submit_button("Suchen", type="primary")
+#if submitted:
+    #t = query_text.strip()
+    #if t:
+    #    st.query_params.update({"q": up.quote(t, safe=""), "view": "grid"})
+     #   st.rerun()
+    #else:
+      #  st.info("Bitte gib einen Suchbegriff ein.")
 
 
 # Raster (Grid) darstellen, wenn q existiert

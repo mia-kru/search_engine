@@ -88,4 +88,21 @@ div[data-testid="stToolbar"]{
 
 /* ===== Dein bestehendes Grid/Card/Tag CSS bleibt darunter unverändert ===== */
 /* ... hier folgt dein .grid/.card/.tag CSS ... */
+
+    .grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+}
+.card {
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  transition: transform .08s ease, box-shadow .08s ease;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+/* ... rest von deinem .card/.tag CSS ... */
 </style>
