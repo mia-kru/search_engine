@@ -125,8 +125,9 @@ st.title("TV-Serien")
 
 # Verarbeitet die aktuelle Anfrage (Query);
 decoded_q = up.unquote(q) if q else ""
+
 with st.form("search_form", clear_on_submit=False):
-query_text = st.text_input(
+    query_text = st.text_input(
     "Suchbegriff eingeben",
     value=decoded_q,
     placeholder="z. B. Breaking Bad, Dark, etc. ..."
