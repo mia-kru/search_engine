@@ -74,7 +74,7 @@ q = qp.get("q", "")  # <-- keep the query in the URL
 # Detail View
 if view == "detail" and selected_id:
     q_t = index.parse_query(selected_id, ["id"])
-    detail_hits = searcher.search(q_t, 1).hits
+    detail_hits = searcher.search(q_t, TOP_K).hits
     detail_score, detail_address = detail_hits[0]
     detail_doc = searcher.doc(detail_address)
     detail_title = detail_doc["title"][0]
@@ -143,7 +143,7 @@ if q:
         u_q = index.parse_query(term, ["title"])  # uses en_stem for "title"
         boolean_parts.append((Occur.Must, u_q))
     boolean_query = Query.boolean_query(boolean_parts)
-    hits = searcher.search(boolean_query, 1).hits
+    hits = searcher.search(boolean_query, TOP_K).hits
 
     if not hits:
         st.warning("Keine Ergebnisse gefunden.")
