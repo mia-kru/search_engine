@@ -1,72 +1,91 @@
 <style>
-/* Streamlit-Leiste oben ausblenden (optional, sieht meist besser aus) */
-header[data-testid="stHeader"] { display: none; }
-div[data-testid="stToolbar"] { display: none; }
+/* Streamlit: Menü ausblenden, aber Top-Bar behalten */
 #MainMenu { visibility: hidden; }
-footer { visibility: hidden; }
 
-/* Layout für unseren eigenen Header/Footer */
-.site-header, .site-footer {
-  background: #111;
-  color: #fff;
-  padding: 14px 18px;
+/* Nur Streamlit-Footer ausblenden (nicht global footer{}) */
+div[data-testid="stFooter"] { display: none !important; }
+
+/* Streamlit Top-Bar einfärben (Deploy/Rerun bleiben rechts sichtbar) */
+header[data-testid="stHeader"]{
+  background:#111 !important;
 }
 
-.site-wrap {
-  max-width: 1100px;
-  margin: 0 auto;
+/* Streamlit Toolbar (rechts) klickbar halten */
+div[data-testid="stToolbar"]{
+  z-index: 1005 !important;
+}
+
+/* ===== Kombinierter Header (links) ===== */
+.appbar-left{
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 280px;          /* Platz für Streamlit Buttons rechts */
+  height: 3.25rem;
   display: flex;
-  gap: 16px;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
+  gap: 14px;
+  padding: 0 18px;
+  z-index: 1004;
+  pointer-events: none;  /* Container blockiert nichts */
 }
 
-.site-brand {
-  color: #fff;
-  text-decoration: none;
-  font-weight: 800;
-  font-size: 18px;
+.appbar-left a,
+.appbar-left input,
+.appbar-left button{
+  pointer-events: auto;  /* Links/Input/Button wieder klickbar */
 }
 
-.site-nav {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.site-nav a {
-  color: #fff;
-  text-decoration: none;
-  padding: 8px 10px;
-  border-radius: 10px;
-}
-.site-nav a:hover { background: rgba(255,255,255,.12); }
-
-.site-search {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex: 1;
-  min-width: 240px;
-  max-width: 520px;
-}
-.site-search input[type="search"]{
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid #ddd;
-}
-.site-search button{
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 0;
-  background: #2d6cdf;
-  color: #fff;
-  cursor: pointer;
+.appbar-left .brand{
+  color:#fff;
+  text-decoration:none;
+  font-weight:800;
+  font-size:18px;
   white-space: nowrap;
 }
-.site-search button:hover{ filter: brightness(.95); }
 
-/* Optional: Inhalt etwas “zentrieren” */
+.appbar-left .nav{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.appbar-left .nav a{
+  color:#fff;
+  text-decoration:none;
+  padding:6px 10px;
+  border-radius:10px;
+}
+.appbar-left .nav a:hover{ background: rgba(255,255,255,.12); }
+
+.appbar-left form{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex:1;
+  max-width: 520px;
+  min-width: 220px;
+}
+.appbar-left input[type="search"]{
+  width:100%;
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid #ddd;
+  box-sizing:border-box;
+}
+.appbar-left button{
+  padding:8px 12px;
+  border-radius:10px;
+  border:0;
+  background:#2d6cdf;
+  color:#fff;
+  cursor:pointer;
+  white-space: nowrap;
+}
+.appbar-left button:hover{ filter: brightness(.95); }
+
+/* Content-Breite wie gehabt */
 .block-container { max-width: 1100px; padding-top: 16px; }
+
+/* ===== Dein bestehendes Grid/Card/Tag CSS bleibt darunter unverändert ===== */
+/* ... hier folgt dein .grid/.card/.tag CSS ... */
 </style>

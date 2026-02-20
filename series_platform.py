@@ -73,24 +73,27 @@ decoded_q = up.unquote(q) if q else ""
 
 
 
-header_html = f"""
-<div class="site-header">
-  <div class="site-wrap">
-    <a class="site-brand" href="/?view=grid">TV-Serien</a>
+import textwrap, html
 
-    <form class="site-search" action="/" method="get">
-      <input type="hidden" name="view" value="grid">
-      <input type="search" name="q" value="{html.escape(decoded_q)}" placeholder="Serie suchen…">
-      <button type="submit">Suchen</button>
-    </form>
+decoded_q = up.unquote(q) if q else ""
 
-    <nav class="site-nav">
-      <a href="/?view=seite1">Unterseite 1</a>
-      <a href="/?view=seite2">Unterseite 2</a>
-    </nav>
+header_html = textwrap.dedent(f"""
+<div class="appbar-left">
+  <a class="brand" href="/?view=grid">TV-Serien</a>
+
+  <form action="/" method="get">
+    <input type="hidden" name="view" value="grid">
+    <input type="search" name="q" value="{html.escape(decoded_q)}" placeholder="Serie suchen…">
+    <button type="submit">Suchen</button>
+  </form>
+
+  <div class="nav">
+    <a href="/?view=seite1">Unterseite 1</a>
+    <a href="/?view=seite2">Unterseite 2</a>
   </div>
 </div>
-"""
+""").strip()
+
 st.markdown(header_html, unsafe_allow_html=True)
 
 full_star = '<i class="fa-solid fa-star"></i>'
