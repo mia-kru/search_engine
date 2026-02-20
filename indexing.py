@@ -199,13 +199,14 @@ for index, row in islice(data.iterrows(), 300):
                         tmdb_vote_count = tmdb.get("vote_count")
                         doc.add_integer("tmdb_vote_count", tmdb_vote_count)
 
+
                     # Trailer-Key über zusätzliche TMDB-API (Videos) ermitteln
-                        # Trailer-Key über zusätzliche TMDB-API (Videos) ermitteln
                     video_response = requests.get(
-                        TMDB_TRAILER_API + str(tmdb.get("id", "")) + "/videos", headers=headers
-                    )
+                        TMDB_TRAILER_API + str(tmdb.get("id", "")) + "/videos",
+                        headers=headers
+                     )
                     key = trailer.get_key(video_response.text)
-                    if isinstance(key, str):
+                    if isinstance(key, str) and key.strip():
                         doc.add_text("trailer", key)
 
                 else:

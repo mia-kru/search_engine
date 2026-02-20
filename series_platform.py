@@ -1,313 +1,459 @@
 import urllib.parse as up
-import textwrap
-import html as pyhtml
 from typing import Any
-
 import streamlit as st
-from tantivy import Query, Index, SchemaBuilder, Occur, Facet
+from tantivy import Query, Index, SchemaBuilder, Occur
 
-# --- Config ---
-SITE_NAME = "TV.Base"
+import utils
+
+# Konstanten
+TMDB_PATH = "https://image.tmdb.org/t/p/original"
 TMDB_PATH_SMALL = "https://image.tmdb.org/t/p/w200"
-INDEX_PATH = "serien_300"  # später: seriens_full o.ä.
+INDEX_PATH = "serien_300"  # bestehendes Tantivy-Index-Verzeichnis
+TOP_K = 20          # wie viele Ergebnisse angezeigt werden sollen
+CARDS_PER_PAGE = 3 # Cards, die in der zufälligen Anzeige auftauchen
 
-RESULTS_PER_PAGE = 24
-MAX_FETCH = 10000  # Tantivy Top-K (für 7k docs ok)
-
-st.set_page_config(page_title=SITE_NAME, layout="wide")
-
-# --- Schema (muss zum Index passen) ---
 schema_builder = SchemaBuilder()
-schema_builder.add_text_field("title", stored=True, tokenizer_name="en_stem")
-schema_builder.add_text_field("description", stored=True, tokenizer_name="en_stem")
-schema_builder.add_text_field("tmdb_overview", stored=True, tokenizer_name="en_stem")
+# Text-Felder
+schema_builder.add_text_field("wikidata", stored=True)
+schema_builder.add_text_field("url", stored=True)
+schema_builder.add_text_field("title", stored=True, tokenizer_name='en_stem')
+schema_builder.add_text_field("description", stored=True, tokenizer_name='en_stem')  # Multi-valued text field
+schema_builder.add_text_field("image", stored=True)
+schema_builder.add_text_field("locations", stored=True)
+schema_builder.add_text_field("countries", stored=True)
+schema_builder.add_text_field("genres", stored=True)
+schema_builder.add_text_field("tmdb_overview", stored=True, tokenizer_name='en_stem')
 schema_builder.add_text_field("tmdb_poster_path", stored=True)
 schema_builder.add_text_field("trailer", stored=True)
-schema_builder.add_text_field("genres", stored=True)
-schema_builder.add_facet_field("facet_genres")
-schema_builder.add_integer_field("id", stored=True, indexed=True)
-schema_builder.add_float_field("tmdb_vote_average", stored=True, fast=True)
-schema = schema_builder.build()
 
+# Integer-Felder
+schema_builder.add_integer_field("id", stored=True, indexed=True)
+schema_builder.add_integer_field("follower", stored=True, fast=True)
+schema_builder.add_integer_field("score", stored=True, fast=True)
+schema_builder.add_integer_field("start", stored=True, fast=True)
+schema_builder.add_integer_field("tmdb_genre_ids", stored=True, indexed=True)
+schema_builder.add_integer_field("tmdb_vote_count", stored=True, fast=True)
+
+# Float-Felder
+schema_builder.add_float_field("tmdb_popularity", stored=True, fast=True)
+schema_builder.add_float_field("tmdb_vote_average", stored=True, fast=True)
+
+# Facettenfelder
+schema_builder.add_facet_field("facet_locations")
+schema_builder.add_facet_field("facet_countries")
+schema_builder.add_facet_field("facet_genres")
+
+schema = schema_builder.build()
 index = Index(schema, path=str(INDEX_PATH))
 
-# --- CSS ---
-with open("styles.html", "r", encoding="utf-8") as f:
-    css = f.read()
-st.markdown(css, unsafe_allow_html=True)
+searcher = index.searcher()
 
-# --- Query Params ---
-def get_qp() -> dict[str, Any]:
-    return getattr(st, "query_params", {})
+from streamlit.components.v1 import iframe
+import pandas as pd
 
-qp = get_qp()
-view = qp.get("view", "home")
-q = qp.get("q", "")
-genre = qp.get("genre", "")
-selected_id = qp.get("id", "")
-page = int(qp.get("p", "1") or "1")
-
-decoded_q = up.unquote(q) if q else ""
-decoded_genre = up.unquote(genre) if genre else ""
-
-# --- Helpers ---
 @st.cache_data(show_spinner=False)
-def load_all_docs(limit: int = MAX_FETCH):
-    index.reload()
-    s = index.searcher()
-    q_all = index.parse_query("*", ["title"])
-    hits = s.search(q_all, limit=limit).hits
-    docs = [s.doc(addr) for _, addr in hits]
+def load_genres_from_csv(path="series.csv") -> list[str]:
+    try:
+        df = pd.read_csv(path)
+        if "genres" not in df.columns:
+            return []
+        genres = set()
+        for cell in df["genres"].dropna().astype(str):
+            for g in cell.split(","):
+                g = g.strip()
+                if g:
+                    genres.add(g)
+        return sorted(genres)
+    except Exception:
+        return []
+
+ALL_GENRES = load_genres_from_csv()
+
+def doc_list(doc, field: str):
+    """Gibt doc[field] als Liste zurück oder [] wenn Feld fehlt."""
+    try:
+        v = doc[field]
+        return v if v is not None else []
+    except Exception:
+        return []
+
+def doc_first(doc, field: str, default=None):
+    """Gibt erstes Element aus doc[field] zurück oder default."""
+    lst = doc_list(doc, field)
+    return lst[0] if lst else default
+
+def get_all_docs(limit=300):
+    try:
+        q_all = Query.all_query()  # falls vorhanden
+    except Exception:
+        q_all = index.parse_query("*", ["title"])  # fallback
+    hits = searcher.search(q_all, limit).hits
+    docs = []
+    for score, addr in hits:
+        doc = searcher.doc(addr)
+        docs.append(doc)
     return docs
 
 @st.cache_data(show_spinner=False)
-def get_all_genres():
-    docs = load_all_docs()
-    gset = set()
-    for d in docs:
-        for g in (d.get("genres") or []):
-            if g and str(g).strip():
-                gset.add(str(g).strip())
-    return sorted(gset)
+def get_top_series_cards(n=5):
+    docs = get_all_docs(limit=300)
+    items = []
+    for doc in docs:
+        title = doc_first(doc, "title", "")
+        doc_id = doc_first(doc, "id", None)
 
-def build_header_html(genres_list: list[str]):
-    # Options für Select
-    opts = ['<option value="">Alle Genres</option>']
-    for g in genres_list:
-        sel = ' selected' if g == decoded_genre else ''
-        opts.append(f'<option value="{pyhtml.escape(g)}"{sel}>{pyhtml.escape(g)}</option>')
-    options_html = "\n".join(opts)
+        poster = doc_list(doc, "tmdb_poster_path")
+        poster_url = (TMDB_PATH_SMALL + poster[0]) if poster else ""
 
-    return textwrap.dedent(f"""
-    <div class="topbar">
-      <div class="top-left">
-        <a class="brand" href="/?view=home">{SITE_NAME}</a>
+        vote_avg = doc_first(doc, "tmdb_vote_average", 0) or 0
+        vote_cnt = doc_first(doc, "tmdb_vote_count", 0) or 0
+        if doc_id is None or not poster_url:
+            continue
+        # kleine “Qualitätsbremse”: min. 50 Votes
+        if vote_cnt < 50:
+            continue
+        items.append((float(vote_avg), int(vote_cnt), int(doc_id), title, poster_url))
+    items.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    return items[:n]
 
-        <form class="searchbar" action="/" method="get">
-          <input type="hidden" name="view" value="search">
-          <input type="search" name="q" value="{pyhtml.escape(decoded_q)}" placeholder="Suchen…">
-          <select name="genre">{options_html}</select>
-          <button type="submit">Suchen</button>
-        </form>
-      </div>
+def render_home():
+    # Banner: wir nehmen 3 Poster aus den Top-Serien und machen daraus einen Background
+    top = get_top_series_cards(5)
+    bg_urls = [t[4].replace("/w200", "/original") for t in top[:3]]  # größere Bilder
+    bg = bg_urls[0] if bg_urls else ""
 
-      <div class="top-right">
-        <a class="navlink" href="/?view=search">Serien</a>
-        <a class="navlink" href="/?view=watchlist">Watchlist</a>
-        <a class="navlink" href="/?view=people">Personen</a>
-      </div>
-    </div>
-    """).strip()
+    st.markdown(
+        f"""
+<div class="hero">
+  <div class="hero-bg" style="background-image:url('{bg}');"></div>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <div class="hero-title">TV.Base - Dein Archiv rund um Bewegtbilder</div>
+    <p class="hero-subtitle">Hier auf TV.Base findest du alles rund um deine Lieblingsserien.</p>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True
+    )
 
-def build_search_query(q_text: str, genre_text: str):
-    parts = []
+    # Reihe 1: Top-Serien
+    st.markdown('<div class="section-title">Top-Serien</div>', unsafe_allow_html=True)
+    row = ['<div class="row-scroll">']
+    for vote_avg, vote_cnt, doc_id, title, poster_url in top:
+        href = f"?view=detail&id={doc_id}"
+        row.append(
+            f"""
+<div class="row-item">
+  <a class="card" href="{href}" target="_self">
+    <img src="{poster_url}" loading="lazy" alt="poster">
+    <div class="t">{title}</div>
+  </a>
+</div>
+"""
+        )
+    row.append("</div>")
+    st.markdown("".join(row), unsafe_allow_html=True)
 
-    q_text = (q_text or "").strip().lower()
-    genre_text = (genre_text or "").strip()
-
-    if q_text:
-        # mehrere Terme => MUST
-        for term in q_text.split():
-            parts.append((Occur.Must, index.parse_query(term, ["title", "tmdb_overview", "description"])))
-    else:
-        parts.append((Occur.Must, index.parse_query("*", ["title"])))
-
-    if genre_text:
-        # Facet-Filter (muss beim Indexieren so gesetzt sein: "/GenreName")
-        parts.append((Occur.Must, Query.term_query(schema, "facet_genres", Facet.from_string(f"/{genre_text}"))))
-
-    if len(parts) == 1:
-        return parts[0][1]
-    return Query.boolean_query(parts)
-
-def get_hits(q_text: str, genre_text: str, limit: int = MAX_FETCH):
-    index.reload()
-    s = index.searcher()
-    query = build_search_query(q_text, genre_text)
-    return s, s.search(query, limit=limit).hits
-
-def poster_url(doc):
-    p = (doc.get("tmdb_poster_path") or [])
-    return (TMDB_PATH_SMALL + p[0]) if p else ""
-
-def doc_title(doc):
-    t = (doc.get("title") or [""])
-    return t[0]
-
-def doc_rating(doc):
-    r = (doc.get("tmdb_vote_average") or [])
-    try:
-        return float(r[0]) if r else None
-    except Exception:
-        return None
-
-# --- Header ---
-genres_list = get_all_genres()
-st.markdown(build_header_html(genres_list), unsafe_allow_html=True)
-
-# --- ROUTES ---
-# Detail Page
-if view == "detail" and selected_id:
-    index.reload()
-    s = index.searcher()
-    q_id = Query.term_query(schema, "id", int(selected_id))
-    hits = s.search(q_id, limit=1).hits
-
-    if not hits:
-        st.warning("Serie nicht gefunden.")
-    else:
-        _, addr = hits[0]
-        d = s.doc(addr)
-
-        title = doc_title(d)
-        overview_src = d.get("tmdb_overview") or d.get("description") or [""]
-        overview = overview_src[0]
-
-        st.subheader(title)
-
-        # Genres
-        gs = d.get("genres") or []
-        if gs:
-            chips = " ".join([f'<span class="chip">{pyhtml.escape(g)}</span>' for g in gs])
-            st.markdown(f"<div class='chips'>{chips}</div>", unsafe_allow_html=True)
-
-        # Trailer
-        tr = d.get("trailer") or []
-        if tr and tr[0]:
-            st.video(f"https://www.youtube.com/watch?v={tr[0]}")
-
-        st.write(overview)
-
-    st.markdown(f"""<div class="site-footer"><a href="/?view=home">{SITE_NAME}</a></div>""",
-                unsafe_allow_html=True)
-    st.stop()
-
-# Watchlist / People placeholder
-if view == "watchlist":
-    st.subheader("Watchlist")
-    st.info("Platzhalter – hier kommt später eure Watchlist-Logik rein.")
-    st.markdown(f"""<div class="site-footer"><a href="/?view=home">{SITE_NAME}</a></div>""",
-                unsafe_allow_html=True)
-    st.stop()
-
-if view == "people":
-    st.subheader("Personen")
-    st.info("Platzhalter – Personensuche/Seite kommt später.")
-    st.markdown(f"""<div class="site-footer"><a href="/?view=home">{SITE_NAME}</a></div>""",
-                unsafe_allow_html=True)
-    st.stop()
-
-# Home Page
-if view == "home":
-    docs = load_all_docs()
-
-    # Top 5 nach Bewertung
-    rated = []
-    for d in docs:
-        r = doc_rating(d)
-        if r is not None:
-            rated.append((r, d))
-    rated.sort(key=lambda x: x[0], reverse=True)
-    top5 = [d for _, d in rated[:5]] if rated else docs[:5]
-
-    # Hero Background (bis zu 12 Poster)
-    bg_imgs = []
-    for d in top5[:3] + docs[:12]:
-        u = poster_url(d)
-        if u:
-            bg_imgs.append(u)
-        if len(bg_imgs) >= 12:
-            break
-
-    imgs_html = "\n".join([f'<img src="{u}" loading="lazy" alt="poster">' for u in bg_imgs]) or ""
-    hero_html = textwrap.dedent(f"""
-    <div class="hero">
-      <div class="hero-bg">{imgs_html}</div>
-      <div class="hero-overlay"></div>
-      <div class="hero-content">
-        <div>
-          <h1>{SITE_NAME} – Dein Archiv rund um Bewegtbilder</h1>
-          <p>Finde Serien, filtere nach Genre und speichere Favoriten in deiner Watchlist.</p>
-        </div>
-      </div>
-    </div>
-    """).strip()
-    st.markdown(hero_html, unsafe_allow_html=True)
-
-    # Row 1: Top-Serien
-    st.markdown("<div class='section'><h2>Top-Serien</h2></div>", unsafe_allow_html=True)
-    cards = ["<div class='row'>"]
-    for d in top5:
-        pid = (d.get("id") or [""])[0]
-        t = doc_title(d)
-        u = poster_url(d)
-        r = doc_rating(d)
-        href = f"/?view=detail&id={pid}"
-        img = f'<img src="{u}" loading="lazy" alt="poster">' if u else "<div></div>"
-        rating_html = f"<span class='star'>★</span> {r:.1f}" if r is not None else ""
-        cards.append(f"""
-          <a class="poster-card" href="{href}" target="_self">
-            {img}
-            <div class="poster-meta">
-              <div class="poster-title">{pyhtml.escape(t)}</div>
-              <div class="poster-sub">{rating_html}</div>
-            </div>
-          </a>
-        """)
-    cards.append("</div>")
-    st.markdown("".join(cards), unsafe_allow_html=True)
-
-    # Row 2: Genres
-    st.markdown("<div class='section'><h2>Genres</h2></div>", unsafe_allow_html=True)
-    chips = ["<div class='chips'>"]
-    for g in genres_list:
-        href = f"/?view=search&genre={up.quote(g)}"
-        chips.append(f'<a class="chip" href="{href}" target="_self">{pyhtml.escape(g)}</a>')
+    # Reihe 2: Genres (klickbar → search view)
+    st.markdown('<div class="section-title">Genres</div>', unsafe_allow_html=True)
+    chips = ['<div class="row-scroll">']
+    for g in ALL_GENRES:
+        href = f"?view=search&genre={up.quote(g)}"
+        chips.append(f'<div class="row-item"><a class="genre-pill" href="{href}" target="_self">{g}</a></div>')
     chips.append("</div>")
     st.markdown("".join(chips), unsafe_allow_html=True)
 
-    st.markdown(f"""<div class="site-footer"><a href="/?view=home">{SITE_NAME}</a></div>""",
-                unsafe_allow_html=True)
-    st.stop()
+from pathlib import Path
 
-# Search Results Page (view=search)
-# -> zeigt Grid anhand q + genre
-s, hits = get_hits(decoded_q, decoded_genre, limit=MAX_FETCH)
+css = Path("styles.html").read_text(encoding="utf-8")
 
-if not hits:
-    st.warning("Keine Ergebnisse gefunden.")
-else:
-    st.subheader("Ergebnisse")
+# optional: FontAwesome (für die Stern-Icons)
+st.markdown(
+    '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.1/css/all.min.css">',
+    unsafe_allow_html=True
+)
 
-    total = len(hits)
-    total_pages = max(1, (total + RESULTS_PER_PAGE - 1) // RESULTS_PER_PAGE)
-    page = max(1, min(page, total_pages))
-    start = (page - 1) * RESULTS_PER_PAGE
-    end = start + RESULTS_PER_PAGE
+# CSS aktivieren (styles.html ist CSS-only)
+st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
-    # Pagination links
-    prev_p = page - 1
-    next_p = page + 1
-    nav = []
-    if page > 1:
-        nav.append(f'<a class="chip" href="/?view=search&q={up.quote(decoded_q)}&genre={up.quote(decoded_genre)}&p={prev_p}" target="_self">← Prev</a>')
-    nav.append(f'<span class="chip">Seite {page}/{total_pages}</span>')
-    if page < total_pages:
-        nav.append(f'<a class="chip" href="/?view=search&q={up.quote(decoded_q)}&genre={up.quote(decoded_genre)}&p={next_p}" target="_self">Next →</a>')
-    st.markdown(f"<div class='chips'>{''.join(nav)}</div>", unsafe_allow_html=True)
 
-    # Grid
+def render_footer():
+    st.markdown(
+        '<div class="site-footer"><a class="brand" href="?view=home" target="_self">TV.Base</a></div>',
+        unsafe_allow_html=True
+    )
+
+def render_header():
+    # Layout per HTML-Container + Streamlit Widgets
+    st.markdown('<div class="site-header"><div class="site-header-inner">', unsafe_allow_html=True)
+
+    # Brand (klickbar)
+    st.markdown('<a class="brand" href="?view=home" target="_self">TV.Base</a>', unsafe_allow_html=True)
+
+    # Suche + Genre (Enter-fähig)
+    with st.form("header_search", clear_on_submit=False):
+        c1, c2, c3 = st.columns([6, 3, 2])
+        with c1:
+            q_in = st.text_input(
+                "Suche",
+                value=q,
+                placeholder="Serie suchen …",
+                label_visibility="collapsed"
+            )
+        with c2:
+            genre_in = st.selectbox(
+                "Genre",
+                options=["Alle"] + ALL_GENRES,
+                index=(["Alle"] + ALL_GENRES).index(genre_filter) if genre_filter in ALL_GENRES else 0,
+                label_visibility="collapsed"
+            )
+        with c3:
+            submitted = st.form_submit_button("Suchen")
+
+    # Nav Buttons
+    n1, n2, n3 = st.columns([1, 1, 1])
+    with n1:
+        if st.button("Serien", use_container_width=True):
+            st.query_params.update({"view": "series", "q": "", "genre": ""})
+            st.rerun()
+    with n2:
+        if st.button("Watchlist", use_container_width=True):
+            st.query_params.update({"view": "watchlist"})
+            st.rerun()
+    with n3:
+        if st.button("Evaluation", use_container_width=True):
+            st.query_params.update({"view": "evaluation"})
+            st.rerun()
+
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+    # Form Submit Handling
+    if submitted:
+        st.query_params.update({
+            "view": "search",
+            "q": q_in.strip(),
+            "genre": "" if genre_in == "Alle" else genre_in
+        })
+        st.rerun()
+
+full_star = '<i class="fa-solid fa-star"></i>'
+half_star = '<i class="fa-solid fa-star-half-stroke"></i>'
+empty_star = '<i class="fa-regular fa-star"></i>'
+
+
+# Hilfsfunktion für Seitenrouting mit Anfrageparametern.
+# Gibt die Query-Parameter der aktuellen Seite als Dictionary zurück.
+# Falls `st.query_params` nicht verfügbar ist, wird ein leeres Dictionary zurückgegeben.
+def get_qp() -> dict[str, Any]:
+    return getattr(st, "query_params", {})
+
+
+qp = get_qp()
+
+def qp_get(key: str, default: str = "") -> str:
+    v = qp.get(key, default)
+    if isinstance(v, list):
+        v = v[0] if v else default
+    return str(v)
+
+view = qp_get("view", "home")     # default: Startseite
+selected_id = qp_get("id", "")
+q = up.unquote_plus(qp_get("q", ""))
+genre_filter = up.unquote_plus(qp_get("genre", ""))
+render_header()
+
+def render_search():
+    st.subheader("Suchergebnisse")
+
+    if not q and not genre_filter:
+        st.info("Gib einen Suchbegriff ein oder wähle ein Genre.")
+        return
+
+    # Query bauen (Title Terms MUST)
+    boolean_parts = []
+    if q.strip():
+        for term in q.lower().strip().split():
+            u_q = index.parse_query(term, ["title"])
+            boolean_parts.append((Occur.Must, u_q))
+
+    # Genre Filter: simplest reliable approach → nachträglich filtern
+    # (Facet-Query wäre eleganter, aber Tantivy-Python API variiert je Version)
+    try:
+        base_q = Query.boolean_query(boolean_parts) if boolean_parts else Query.all_query()
+    except Exception:
+        base_q = Query.boolean_query(boolean_parts) if boolean_parts else index.parse_query("*", ["title"])
+
+    hits = searcher.search(base_q, TOP_K).hits
+
+    if not hits:
+        st.warning("Keine Ergebnisse gefunden.")
+        return
+
     cards_html = ['<div class="grid">']
-    for _, addr in hits[start:end]:
-        d = s.doc(addr)
-        pid = (d.get("id") or [""])[0]
-        t = doc_title(d)
-        u = poster_url(d)
-        href = f"/?view=detail&id={pid}"
-        img_tag = f'<img src="{u}" loading="lazy" alt="poster">' if u else ""
-        cards_html.append(f"""<a class="card" href="{href}" target="_self">{img_tag}<div class="t">{pyhtml.escape(t)}</div></a>""")
+    added = 0
+    for score, addr in hits:
+        doc = searcher.doc(addr)
+
+        # Genre-Filter nachträglich (Textfeld "genres" ist stored)
+        if genre_filter:
+            gs = doc_list(doc, "genres")
+            if genre_filter not in gs:
+                continue
+
+        doc_id = doc["id"][0]
+        title = doc["title"][0]
+        poster = doc_list(doc, "tmdb_poster_path")
+        poster_url = (TMDB_PATH_SMALL + poster[0]) if poster else ""
+        href = f"?view=detail&id={doc_id}&q={up.quote(q)}&genre={up.quote(genre_filter)}"
+        img_tag = f'<img src="{poster_url}" loading="lazy" alt="poster">' if poster_url else ""
+        cards_html.append(f"""<a class="card" href="{href}" target="_self">{img_tag}<div class="t">{title}</div></a>""")
+        added += 1
+        if added >= TOP_K:
+            break
+
     cards_html.append("</div>")
     st.markdown("".join(cards_html), unsafe_allow_html=True)
 
-st.markdown(f"""<div class="site-footer"><a href="/?view=home">{SITE_NAME}</a></div>""",
-            unsafe_allow_html=True)
+def render_series():
+    st.subheader("Serien")
+
+    # zeigt alle Serien (optional gefiltert nach Genre aus Query-Param)
+    try:
+        base_q = Query.all_query()
+    except Exception:
+        base_q = index.parse_query("*", ["title"])
+
+    hits = searcher.search(base_q, TOP_K).hits
+
+    if not hits:
+        st.warning("Keine Serien gefunden.")
+        return
+
+    cards_html = ['<div class="grid">']
+    added = 0
+    for score, addr in hits:
+        doc = searcher.doc(addr)
+
+        # optional: Genre-Filter anwenden
+        if genre_filter:
+            gs = doc_list(doc, "genres")
+            if genre_filter not in gs:
+                continue
+
+        doc_id = doc["id"][0]
+        title = doc["title"][0]
+        poster = doc_list(doc, "tmdb_poster_path")
+        poster_url = (TMDB_PATH_SMALL + poster[0]) if poster else ""
+        href = f"?view=detail&id={doc_id}&genre={up.quote(genre_filter)}"
+        img_tag = f'<img src="{poster_url}" loading="lazy" alt="poster">' if poster_url else ""
+        cards_html.append(f"""<a class="card" href="{href}" target="_self">{img_tag}<div class="t">{title}</div></a>""")
+        added += 1
+        if added >= TOP_K:
+            break
+
+    cards_html.append("</div>")
+    st.markdown("".join(cards_html), unsafe_allow_html=True)
+
+def render_watchlist():
+    st.subheader("Watchlist")
+
+    wl = st.session_state.get("watchlist", set())
+    if not wl:
+        st.info("Deine Watchlist ist leer.")
+        return
+
+    cards_html = ['<div class="grid">']
+    for doc_id in sorted(wl):
+        q_t = index.parse_query(str(doc_id), ["id"])
+        hits = searcher.search(q_t, 1).hits
+        if not hits:
+            continue
+        _, addr = hits[0]
+        doc = searcher.doc(addr)
+        title = doc["title"][0]
+        poster = doc_list(doc, "tmdb_poster_path")
+        poster_url = (TMDB_PATH_SMALL + poster[0]) if poster else ""
+        href = f"?view=detail&id={doc_id}"
+        img_tag = f'<img src="{poster_url}" loading="lazy" alt="poster">' if poster_url else ""
+        cards_html.append(f"""<a class="card" href="{href}" target="_self">{img_tag}<div class="t">{title}</div></a>""")
+    cards_html.append("</div>")
+    st.markdown("".join(cards_html), unsafe_allow_html=True)
+
+    if st.button("Watchlist leeren"):
+        st.session_state.watchlist = set()
+        st.rerun()
+
+
+def render_evaluation():
+    st.subheader("Evaluation")
+    st.write("Bitte nimm dir 2 Minuten Zeit für unsere Umfrage 🙂")
+
+    # Beispiel: Google Forms / Typeform / LimeSurvey Link (Embed-Link!)
+    SURVEY_URL = "https://docs.google.com/forms/d/e/1FAIpQLSesh9qO-J9xvxyQHNWzbqZ--ilXqcICUzYb3CYNs2uaoR3tOg/viewform?embedded=true"
+
+    # iFrame einbetten
+    iframe(SURVEY_URL, height=900, scrolling=True)
+
+
+# Detail View
+if view == "detail" and selected_id:
+    q_t = index.parse_query(selected_id, ["id"])
+    detail_hits = searcher.search(q_t, TOP_K).hits
+    detail_score, detail_address = detail_hits[0]
+    detail_doc = searcher.doc(detail_address)
+    detail_title = detail_doc["title"][0]
+    detail_overview_src = detail_doc["tmdb_overview"] or detail_doc["description"]
+    detail_overview = detail_overview_src[0]
+    detail_poster = detail_doc["tmdb_poster_path"]
+    detail_poster_url = (TMDB_PATH_SMALL + detail_poster[0]) if detail_poster else ""
+    trailer = detail_doc["trailer"]
+    video_key = detail_doc["trailer"][0] if trailer else ""
+    st.title(detail_title)
+    genres = detail_doc["genres"]
+    tags_html = "<div>"
+    if genres is not None:
+        for tag in genres:
+            tags_html += f'<span class="tag">{tag}</span>'
+        tags_html += "</div>"
+    st.markdown(tags_html, unsafe_allow_html=True)
+    if video_key != "":
+        st.video(f"https://www.youtube.com/watch?v={video_key}")
+    st.write(detail_overview)
+
+
+    if "watchlist" not in st.session_state:
+        st.session_state.watchlist = set()
+
+    if st.button("⭐ Zur Watchlist hinzufügen"):
+        st.session_state.watchlist.add(int(selected_id))
+        st.success("Zur Watchlist hinzugefügt!")
+
+    if st.button("← Zurück"):
+        back_view = "search" if (q or genre_filter) else "home"
+        payload = {"view": back_view}
+        if q:
+            payload["q"] = q
+        if genre_filter:
+            payload["genre"] = genre_filter
+
+        st.query_params.update(payload)
+        st.query_params.pop("id", None)
+        st.rerun()
+    render_footer()
+    st.stop()
+
+if view == "home":
+    render_home()
+elif view == "search":
+    render_search()
+elif view == "series":
+    render_series()
+elif view == "watchlist":
+    render_watchlist()
+elif view == "evaluation":
+    render_evaluation()
+else:
+    render_home()
+
+render_footer()
+st.stop()

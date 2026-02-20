@@ -1,10 +1,13 @@
 import json
 
-
-def get_key(response_text: str, platform: str = "youtube", allowed_langs: list[str] = ["de", "en"]) -> str:
+    def get_key(
+            response_text: str,
+            platform: str = "youtube",
+            allowed_langs: tuple[str, ...] = ("de", "en"),
+    ) -> str | None:
     try:
         data = json.loads(response_text)
-        print(data)
+        # print(data)
     except (ValueError, json.JSONDecodeError):
         data = {}
 
