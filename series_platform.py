@@ -124,7 +124,12 @@ st.title("TV-Serien")
 # utils.display_random_items(random_cards_html)
 
 # Verarbeitet die aktuelle Anfrage (Query);
-query_text = st.text_input("Suchbegriff eingeben", value=q, placeholder="z. B. Breaking Bad, Dark, etc. ...")
+decoded_q = up.unquote(q) if q else ""
+query_text = st.text_input(
+    "Suchbegriff eingeben",
+    value=decoded_q,
+    placeholder="z. B. Breaking Bad, Dark, etc. ..."
+)
 if st.button("Suchen", type="primary"):
     if not query_text:
         st.info("Bitte gib einen Suchbegriff ein.")
