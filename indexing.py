@@ -111,7 +111,7 @@ df = pd.DataFrame(data)  # optional: falls weitere Pandas-Operationen geplant si
 # 5) Für jede Serie: Wikipedia-Seite laden, TMDB-Daten per API ergänzen,
 # Dokument zusammenstellen und in den Index schreiben.
 # islice(..., 10) beschränkt auf die ersten 10 Einträge – bei Bedarf anpassen/entfernen
-for index, row in islice(data.iterrows(), 300):
+for index, row in islice(data.iterrows(), 8000):
 #for index, row in data.iterrows():
     # Wikipedia-Titel aus der URL extrahieren und decodieren
     path = urlparse(row["wikipediaPage"]).path
