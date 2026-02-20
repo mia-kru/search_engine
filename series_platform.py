@@ -125,18 +125,21 @@ st.title("TV-Serien")
 
 # Verarbeitet die aktuelle Anfrage (Query);
 decoded_q = up.unquote(q) if q else ""
+with st.form("search_form", clear_on_submit=False):
 query_text = st.text_input(
     "Suchbegriff eingeben",
     value=decoded_q,
     placeholder="z. B. Breaking Bad, Dark, etc. ..."
 )
-if st.button("Suchen", type="primary"):
-    if not query_text:
-        st.info("Bitte gib einen Suchbegriff ein.")
-    else:
-        # Speichert die Anfrageparameter und lädt die Seite erneut
-        st.query_params.update({"q": up.quote(query_text, safe=''), "view": "grid"})
+    submitted = st.form_submit_button("Suchen", type="primary")
+if submitted:
+    t = query_text.strip()
+    if t:
+        st.query_params.update({"q": up.quote(t, safe=""), "view": "grid"})
         st.rerun()
+    else:
+        st.info("Bitte gib einen Suchbegriff ein.")
+
 
 # Raster (Grid) darstellen, wenn q existiert
 if q:
