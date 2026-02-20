@@ -49,7 +49,7 @@ index = Index(schema, path=str(INDEX_PATH))
 searcher = index.searcher()
 
 
-with open("styles.html", "r") as f:
+with open("styles.html", "r", encoding="utf-8") as f:
     css = f.read()
 
 st.markdown(css, unsafe_allow_html=True)
@@ -202,13 +202,3 @@ if q:
         st.markdown("".join(cards_html), unsafe_allow_html=True)
 else:
     st.info("Gib einen Suchbegriff ein und klicke auf **Suchen** (oder drücke Enter).")
-
-footer_html = """
-<div class="site-footer">
-  <div class="site-wrap">
-    <a class="site-brand" href="/?view=grid">TV-Serien</a>
-    <span style="opacity:.8;">© 2026</span>
-  </div>
-</div>
-"""
-st.markdown(footer_html, unsafe_allow_html=True)
