@@ -57,7 +57,21 @@ st.markdown(css, unsafe_allow_html=True)
 import html
 import urllib.parse as up
 
+# Hilfsfunktion für Seitenrouting mit Anfrageparametern.
+# Gibt die Query-Parameter der aktuellen Seite als Dictionary zurück.
+# Falls `st.query_params` nicht verfügbar ist, wird ein leeres Dictionary zurückgegeben.
+def get_qp() -> dict[str, Any]:
+    return getattr(st, "query_params", {})
+
+
+qp = get_qp()
+view = qp.get("view")
+selected_id = qp.get("id")
+q = qp.get("q", "")  # <-- keep the query in the URL
+
 decoded_q = up.unquote(q) if q else ""
+
+
 
 header_html = f"""
 <div class="site-header">
@@ -83,18 +97,6 @@ full_star = '<i class="fa-solid fa-star"></i>'
 half_star = '<i class="fa-solid fa-star-half-stroke"></i>'
 empty_star = '<i class="fa-regular fa-star"></i>'
 
-
-# Hilfsfunktion für Seitenrouting mit Anfrageparametern.
-# Gibt die Query-Parameter der aktuellen Seite als Dictionary zurück.
-# Falls `st.query_params` nicht verfügbar ist, wird ein leeres Dictionary zurückgegeben.
-def get_qp() -> dict[str, Any]:
-    return getattr(st, "query_params", {})
-
-
-qp = get_qp()
-view = qp.get("view")
-selected_id = qp.get("id")
-q = qp.get("q", "")  # <-- keep the query in the URL
 
 # Detail View
 if view == "detail" and selected_id:
